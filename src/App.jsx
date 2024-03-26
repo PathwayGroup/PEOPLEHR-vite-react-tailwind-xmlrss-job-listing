@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
 function MyComponent() {
+  // Existing state variables
   const [vacancies, setVacancies] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVacancy, setSelectedVacancy] = useState(null);
   const [isDetailsPopupOpen, setIsDetailsPopupOpen] = useState(false);
   const [searchCity, setSearchCity] = useState('');
   const [channelFilter, setChannelFilter] = useState('All');
+  const [isLoading, setIsLoading] = useState(false); // New loading state
+
   const channel1Label = 'Staff Vacancies';
   const channel2Label = 'External Vacancies';
 
@@ -39,16 +42,26 @@ function MyComponent() {
     });
   };
 
+  const resetFilters = () => {
+    setSearchCity('');
+    setChannelFilter('All');
+    setSearchTerm('');
+    // Reset any other filters you have
+  };
+
   useEffect(() => {
+    setIsLoading(true); // Start loading
     setVacancies([]); // Reset vacancies when component mounts
-    fetchAndUpdateVacancies(
-      'https://sortmycors.rihards-man-private.workers.dev/corsproxy/?channel=1',
-      'Channel1'
-    );
-    fetchAndUpdateVacancies(
-      'https://sortmycors.rihards-man-private.workers.dev/corsproxy/?channel=2',
-      'Channel2'
-    );
+    Promise.all([
+      fetchAndUpdateVacancies(
+        'https://sortmycors.rihards-man-private.workers.dev/corsproxy/?channel=1',
+        'Channel1'
+      ),
+      fetchAndUpdateVacancies(
+        'https://sortmycors.rihards-man-private.workers.dev/corsproxy/?channel=2',
+        'Channel2'
+      ),
+    ]).finally(() => setIsLoading(false)); // Stop loading regardless of the result
   }, []);
   const handleDetailsClick = vacancy => {
     setSelectedVacancy(vacancy);
@@ -60,14 +73,21 @@ function MyComponent() {
   };
 
   const filteredVacancies = vacancies.filter(vacancy => {
+    const jobTitle = vacancy.jobtitle || ""; // Fallback to empty string if undefined
+    const city = vacancy.city || ""; // Fallback to empty string if undefined
+    const term = searchTerm || ""; // Fallback to empty string if undefined
     return (
-      vacancy.jobtitle.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      vacancy.city.includes(searchCity) &&
+      jobTitle.toLowerCase().includes(term.toLowerCase()) &&
+      city.includes(searchCity) &&
       (channelFilter === 'All' || vacancy.source === channelFilter)
     );
   });
 
-  const cities = [...new Set(vacancies.map(vacancy => vacancy.city))];
+  // Dynamic options based on selections
+  const cities = [...new Set(vacancies.filter(vacancy => channelFilter === 'All' || vacancy.source === channelFilter).map(vacancy => vacancy.city))];
+
+//  const cities = [...new Set(vacancies.map(vacancy => vacancy.city))];
+ 
   const channels = [
     { value: 'All', label: 'All Vacancies' },
     { value: 'Channel1', label: channel1Label },
@@ -159,36 +179,49 @@ function MyComponent() {
 
   return (
     <React.Fragment>
-      <div className="grid grid-cols-1 lg:grid-cols-3 md:grid-cols-3 sm:grid-cols-1  gap-4 space-x-0 md:space-x-0 sm:space-x-0 mb-4 p-3">
+      <div className="grid align:center grid-cols-1 lg:grid-cols-3 md:grid-cols-3 sm:grid-cols-1  gap-4 space-x-0 md:space-x-0 sm:space-x-0 mb-4 p-3">
         <input
           type="text"
-          className="flex-1 block w-full px-3 py-2 bg-white border shadow-sm border-gray-300 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 rounded-lg transition-height duration-500 ease-in-out"
+          className={`flex-1 block w-full px-3 py-2 bg-white border shadow-sm border-gray-300 placeholder-gray-400 focus:outline-none focus:ring-1 ${searchTerm ? 'focus:ring-gray-500' : 'focus:ring-gray-500'} rounded-lg transition-colors duration-300 ease-in-out`}
           placeholder="Search by title..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
         />
-        <select
-          className="rounded-lg w-full  transition-height duration-500 ease-in-out block px-3 py-2 bg-white border shadow-sm border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-500"
-          value={searchCity}
-          onChange={e => setSearchCity(e.target.value)}
+ <select
+          className={`rounded-lg w-full transition-colors duration-300 ease-in-out block px-3 py-2 bg-white border shadow-sm ${searchCity ? 'border-green-500' : 'border-gray-300'} focus:outline-none focus:ring-1 focus:ring-gray-500`}
+           value={searchCity}
+          onChange={e => { setSearchCity(e.target.value); }}
         >
           <option value="">All Locations</option>
           {cities.map((city, i) => (
             <option key={i} value={city}>{city}</option>
           ))}
         </select>
+        <div className={`grid w-full grid-cols-3  gap-4 `}>
         <select
-          className="rounded-lg w-full transition-height duration-500 ease-in-out block px-3 py-2 bg-white border shadow-sm border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          className={`col-start-1 col-span-2 rounded-lg w-100 transition-colors duration-300 ease-in-out block px-3 py-2 bg-white border shadow-sm ${channelFilter !== 'All' ? 'border-green-500' : 'border-gray-300'} focus:outline-none focus:ring-1 focus:ring-gray-500`}
           value={channelFilter}
-          onChange={e => setChannelFilter(e.target.value)}
+          onChange={e => { setChannelFilter(e.target.value); setSearchCity(''); }}
         >
           {channels.map((channel, i) => (
             <option key={i} value={channel.value}>{channel.label}</option>
           ))}
         </select>
+              {/* Reset button */}
+      <button        onClick={resetFilters} type="button" className="col-start-3 col-span-1 bg-white rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+             
+          
+              <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span class="sr-only">Reset</span>
+            </button>
+            </div>
       </div>
         <div className="grid p-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 rounded-lg transition-height duration-500 ease-in-out">
-        {filteredVacancies.length > 0 ? (
+        {isLoading ? (
+          <div>Loading...</div> // Placeholder for loading animation or spinner
+        ) : filteredVacancies.length > 0 ? (
           filteredVacancies.map((vacancy, index) => (
             <React.Suspense key={index} fallback={<div>Loading...</div>}>
               <div onClick={() => handleDetailsClick(vacancy)} 
